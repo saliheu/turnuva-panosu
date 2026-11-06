@@ -117,6 +117,13 @@ export interface DrawStep {
   to: string;
 }
 
+/** Canlı kura panosunda bir kart (grup veya eşleşme). Boş yerler takımlar çekildikçe dolar. */
+export interface LiveSlot {
+  title: string;
+  kind: 'match' | 'list';
+  entries: ({ teamId: TeamId } | { text: string })[];
+}
+
 export interface Stage {
   id: string;
   type: StageType;
@@ -134,6 +141,8 @@ export interface Stage {
   /** Aşama tamamlanınca onaylanan üst tura çıkanlar */
   qualifiers?: Qualifier[];
   drawSteps?: DrawStep[];
+  /** Canlı kura panosunun düzeni */
+  drawLayout?: LiveSlot[];
   drawMode?: DrawMode;
   drawSeed?: number;
   drawSummary?: string;

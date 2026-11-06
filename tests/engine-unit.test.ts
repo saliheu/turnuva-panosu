@@ -13,6 +13,7 @@ import {
   describeProposal,
   ekLi,
   groupSwapImpact,
+  liveDrawPlan,
   groupTables,
   newTournament,
   proposeDraw,
@@ -267,6 +268,35 @@ describe('eleme ağacı ve seri başı', () => {
         expect(new Set([seedRank.get(f.a!), seedRank.get(f.b!)])).toEqual(new Set([1, 2]));
         const semis = stage.matches.filter((m) => m.round === rounds - 1);
         expect(new Set(semis.flatMap((m) => [res.get(m.id)!.a, res.get(m.id)!.b]).map((id) => seedRank.get(id!)))).toEqual(new Set([1, 2, 3, 4]));
+      }
+    }
+  });
+
+  it('canlı kura panosu: her takım bir kez, çekildiği kartta; güç sırası gösterilmez', () => {
+    for (const n of [4, 9, 13, 16, 20]) {
+      for (const plan of [
+        [{ type: 'eleme' as const, name: 'E', settings: defaultSettings('eleme') }],
+        [
+          { type: 'grup' as const, name: 'G', settings: { ...defaultSettings('grup'), groupCount: 2 } },
+          { type: 'eleme' as const, name: 'E', settings: defaultSettings('eleme') },
+        ],
+      ]) {
+        const t = makeTournament(n);
+        setFormat(t, plan);
+        for (const mode of ['dengeli', 'rastgele'] as const) {
+          const p = proposeDraw(t, t.stages[0].id, mode, n);
+          const { steps, layout } = liveDrawPlan(p);
+          const ids = layout.flatMap((c) => c.entries.filter((e) => 'teamId' in e).map((e) => (e as { teamId: string }).teamId));
+          expect(new Set(ids).size).toBe(n);
+          expect(ids.length).toBe(n);
+          expect(steps.length).toBe(n);
+          for (const st of steps) {
+            const card = layout.find((c) => c.title === st.to)!;
+            expect(card, st.to).toBeTruthy();
+            expect(card.entries.some((e) => 'teamId' in e && e.teamId === st.teamId)).toBe(true);
+            expect(st.from).not.toMatch(/Güç sırası/);
+          }
+        }
       }
     }
   });

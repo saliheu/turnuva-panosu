@@ -1508,3 +1508,26 @@ fieldset.seeding-box legend {
   margin-top: 0.2rem;
   color: var(--ink-2);
 }
+
+/* Canlı kura kartları */
+.live-board .slot .vs {
+  font-family: var(--display);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  opacity: 0.55;
+  margin: 0.1rem 0;
+}
+.live-board .slot .unknown {
+  opacity: 0.35;
+  font-weight: 700;
+}
+.live-board .slot .ph {
+  opacity: 0.6;
+  font-style: italic;
+}
+.live-board .slot.match-slot {
+  text-align: center;
+}
+.live-board .fresh {
+  animation: pop 0.5s ease;
+}

@@ -18,5 +18,5 @@ export default function LiveDrawPage() {
   if (!t) return <Spinner />;
   const stage = t.stages.find((s) => s.id === stageId);
   if (!stage?.drawSteps?.length) return <div className="empty">Bu aşama için kura kaydı yok.</div>;
-  return <LiveDraw t={t} title={`${t.name} · ${stage.name}`} steps={stage.drawSteps} onClose={() => navigate(`/t/${t.id}`)} />;
+  return <LiveDraw t={t} title={`${t.name} · ${stage.name}`} steps={stage.drawSteps} layout={stage.drawLayout} onClose={() => navigate(`/t/${t.id}`)} />;
 }

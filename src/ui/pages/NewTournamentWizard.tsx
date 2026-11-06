@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { analyzePlan, STAGE_TYPE_LABELS, type StagePlan } from '../../engine/planner';
+import { analyzePlan, type StagePlan } from '../../engine/planner';
 import { CRITERION_LABELS, DEFAULT_CRITERIA } from '../../engine/standings';
 import { newTournament, scoringPreset, setFormat, slugify } from '../../engine/tournament';
 import type { Tournament } from '../../engine/types';
@@ -10,6 +10,7 @@ import { Spinner, useConfirm, useDocumentTitle, useToast } from '../common';
 import { useSession } from '../session';
 import { TournamentCtx, type TournamentCtxValue } from '../tournament/ctx';
 import { FormatEditor } from '../tournament/FormatTab';
+import { PlanSummary } from '../tournament/PlanSummary';
 import { ScoringEditor, SportInput, yearOptions } from '../tournament/SettingsTab';
 import { TeamsTab } from '../tournament/TeamsTab';
 
@@ -349,36 +350,7 @@ export default function NewTournamentWizard() {
               </dd>
               <dt>Format</dt>
               <dd>
-                <div className="flow">
-                  <span className="step">
-                    <b>{n} takım</b>
-                  </span>
-                  {analysis.flow.map((f, i) => (
-                    <span key={i} style={{ display: 'contents' }}>
-                      <span className="muted">→</span>
-                      <span className="step">
-                        <b>{f.name}</b> <span className="small muted">{STAGE_TYPE_LABELS[f.type]} · {f.text}</span>
-                      </span>
-                    </span>
-                  ))}
-                </div>
-                {st.plan.map((p, i) => (
-                  <div key={i} className="tiny muted" style={{ marginTop: 4 }}>
-                    {p.name}:{' '}
-                    {[
-                      p.settings.legs === 2 && 'çift maç',
-                      p.settings.legs === 1 && (p.type === 'grup' || p.type === 'lig') && 'tek maç',
-                      p.type === 'on-eleme' && `${p.settings.target ?? 0} takım ana tabloya kalır`,
-                      p.settings.bestExtra?.enabled && `en iyi ${p.settings.bestExtra.count} ek takım`,
-                      p.type === 'eleme' && i > 0 && st.plan[i - 1].type !== 'on-eleme' && (p.settings.pairing === 'capraz' ? 'çapraz eşleşme' : p.settings.pairing === 'elle' ? 'elle eşleşme' : 'sıralı eşleşme'),
-                      p.type === 'eleme' && i > 0 && st.plan[i - 1].type !== 'on-eleme' && p.settings.avoidSameGroup !== false && 'aynı grup ilk turda karşılaşmaz',
-                      p.type === 'eleme' && i === 0 && (p.settings.seeding === 'kesin' ? 'kesin güç sıralaması' : 'kademeli kura (güçlüler erken karşılaşmaz)'),
-                      p.type === 'eleme' && (p.settings.thirdPlace ? 'üçüncülük maçı var' : 'üçüncülük maçı yok'),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </div>
-                ))}
+                <PlanSummary n={n} plan={st.plan} />
                 <button className="link" onClick={() => go(2)}>
                   Düzenle
                 </button>

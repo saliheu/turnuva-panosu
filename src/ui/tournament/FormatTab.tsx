@@ -15,6 +15,7 @@ import { setFormat } from '../../engine/tournament';
 import type { Criterion, StageType } from '../../engine/types';
 import { useConfirm } from '../common';
 import { useT } from './ctx';
+import { PlanSummary } from './PlanSummary';
 import { ordinalPlural, ordinalWord } from '../../engine/util';
 
 function CriteriaEditor({ value, onChange, disabled }: { value: Criterion[]; onChange: (v: Criterion[]) => void; disabled?: boolean }) {
@@ -286,33 +287,10 @@ function StageEditor({
             Üçüncülük maçı oynansın
           </label>
           {!prevType && (
-            <fieldset className="seeding-box" disabled={locked}>
-              <legend>Eleme ağacı nasıl dizilsin?</legend>
-              <label className={`seed-opt${s.seeding !== 'kesin' ? ' on' : ''}`}>
-                <input type="radio" name={`seeding-${index}`} checked={s.seeding !== 'kesin'} onChange={() => set({ seeding: 'kademeli' })} />
-                <span>
-                  <b>Kademeli kura</b> <span className="badge done">Önerilen</span>
-                  <span className="small seed-desc">
-                    En güçlü iki takım ağacın ayrı yarılarına konur; ancak finalde karşılaşabilirler. Sonraki güçlüler de (3.–4., 5.–8. …) birbirine erken
-                    denk gelmeyecek şekilde ayrı bölümlere <b>kurayla</b> dağıtılır. İlk turda güçlü takımların rakibi zayıflar arasından kurayla belirlenir.
-                    Her kurada farklı bir ağaç çıkar.
-                  </span>
-                </span>
-              </label>
-              <label className={`seed-opt${s.seeding === 'kesin' ? ' on' : ''}`}>
-                <input type="radio" name={`seeding-${index}`} checked={s.seeding === 'kesin'} onChange={() => set({ seeding: 'kesin' })} />
-                <span>
-                  <b>Kesin güç sıralaması</b>
-                  <span className="small seed-desc">
-                    Takımlar tamamen güç puanına göre dizilir: en güçlü takım en zayıfla, ikinci en güçlü sondan ikinciyle eşleşir. Kurada şans yoktur
-                    (yalnızca güç puanı aynı olanların sırası kurayla belirlenir); her çekilişte aynı ağaç çıkar.
-                  </span>
-                </span>
-              </label>
-              <p className="small muted" style={{ margin: '0.35rem 0 0' }}>
-                Takım sayısı 2, 4, 8, 16, 32 veya 64 değilse en zayıf takımlar önce ön eleme oynar; ön eleme maçları ağacın en solunda görünür.
-              </p>
-            </fieldset>
+            <p className="small muted" style={{ margin: '0.5rem 0 0' }}>
+              Kuranın nasıl çekileceğini (kademeli kura, kesin güç sıralaması veya tamamen rastgele) kura ekranında seçeceksiniz. Takım sayısı 2, 4, 8, 16,
+              32 veya 64 değilse en zayıf takımlar önce ön eleme oynar; ön eleme maçları ağacın en solunda görünür.
+            </p>
           )}
         </div>
       )}
@@ -492,6 +470,8 @@ export function FormatTab() {
   const firstStageN = drawnCount && t.stages[0].entrants ? t.stages[0].entrants.length : n;
   const analysis = useMemo(() => analyzePlan(firstStageN, plan), [firstStageN, plan]);
   const dirty = JSON.stringify(plan) !== JSON.stringify(initial);
+  // Format belirlendiyse kilitli özet gösterilir; değiştirmek için düğmeye basılır
+  const [editing, setEditing] = useState(t.stages.length === 0);
 
   const save = async () => {
     if (analysis.errors.length) {
@@ -517,6 +497,25 @@ export function FormatTab() {
     });
   };
 
+  if (!editing) {
+    return (
+      <div className="card">
+        <div className="section-head" style={{ marginBottom: '0.5rem' }}>
+          <h3 style={{ margin: 0 }}>🔒 Turnuva formatı</h3>
+          <button className="btn ghost sm" onClick={() => setEditing(true)}>
+            Formatı değiştir
+          </button>
+        </div>
+        <PlanSummary n={firstStageN} plan={initial} showCriteria />
+        {drawnCount > 0 && (
+          <p className="tiny muted" style={{ marginBottom: 0 }}>
+            Kurası çekilmiş aşamaların yapısı değiştirilemez; yalnızca adları, sıralama kriterleri ve henüz kurası çekilmemiş aşamalar değiştirilebilir.
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <>
       <FormatEditor
@@ -532,9 +531,9 @@ export function FormatTab() {
         <button className="btn accent" disabled={!dirty || !plan.length} onClick={save}>
           Formatı kaydet
         </button>
-        {dirty && (
-          <button className="btn ghost" onClick={() => setPlan(initial)}>
-            Değişiklikleri geri al
+        {t.stages.length > 0 && (
+          <button className="btn ghost" onClick={() => (setPlan(initial), setEditing(false))}>
+            Vazgeç
           </button>
         )}
       </div>

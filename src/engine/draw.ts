@@ -3,6 +3,7 @@ import type {
   DrawMode,
   DrawStep,
   Group,
+  LiveSlot,
   Match,
   Qualifier,
   Slot,
@@ -42,6 +43,8 @@ export interface DrawProposal {
   labels: Record<TeamId, string>;
   steps: DrawStep[];
   notes: string[];
+  /** İlk aşama eleme ise kullanılan diziliş */
+  seeding?: 'kademeli' | 'kesin';
 }
 
 export function stageIndex(t: Tournament, stageId: string): number {
@@ -258,7 +261,7 @@ export function crossPairs(qs: Qualifier[]): { a: TeamId; b: TeamId }[] | null {
   return [...top, ...bottom];
 }
 
-function drawKnockout(t: Tournament, stage: Stage, entrants: Qualifier[], mode: DrawMode, rng: () => number, isFirst: boolean) {
+function drawKnockout(t: Tournament, stage: Stage, entrants: Qualifier[], mode: DrawMode, rng: () => number, isFirst: boolean, seeding: 'kademeli' | 'kesin') {
   const notes: string[] = [];
   const labels: Record<TeamId, string> = {};
   let pairs: { a: TeamId | null; b: TeamId | null }[];
@@ -268,7 +271,7 @@ function drawKnockout(t: Tournament, stage: Stage, entrants: Qualifier[], mode: 
     const ordered = seedOrder(teamsOf(t, entrants.map((e) => e.teamId)), mode, rng).map((x) => x.id);
     if (mode === 'dengeli') {
       ordered.forEach((id, i) => (labels[id] = String(i + 1)));
-      pairs = balancedPairs(ordered, stage.settings.seeding === 'kesin' ? 'kesin' : 'kademeli', rng);
+      pairs = balancedPairs(ordered, seeding, rng);
     } else pairs = seededPairs(ordered);
   } else {
     const fromGroups = entrants.some((e) => e.group);
@@ -349,7 +352,11 @@ function drawPrelim(t: Tournament, stage: Stage, entrants: Qualifier[], mode: Dr
 // Öneri üret / uygula
 // ---------------------------------------------------------------------------
 
-export function proposeDraw(t: Tournament, stageId: string, mode: DrawMode, seed: number): DrawProposal {
+/**
+ * Kura önerisi üretir.
+ * @param opts.seeding İlk aşama eleme ise ağacın dizilişi (verilmezse aşama ayarı, o da yoksa "kademeli").
+ */
+export function proposeDraw(t: Tournament, stageId: string, mode: DrawMode, seed: number, opts: { seeding?: 'kademeli' | 'kesin' } = {}): DrawProposal {
   const idx = stageIndex(t, stageId);
   const stage = t.stages[idx];
   if (!stage) throw new Error('Aşama bulunamadı');
@@ -375,8 +382,100 @@ export function proposeDraw(t: Tournament, stageId: string, mode: DrawMode, seed
     const r = drawPrelim(t, stage, entrants, mode, rng);
     return { ...base, pairs: r.pairs, direct: r.direct, labels: r.labels, steps: r.steps, notes: [] };
   }
-  const r = drawKnockout(t, stage, entrants, mode, rng, idx === 0);
-  return { ...base, pairs: r.pairs, labels: r.labels, steps: r.steps, notes: r.notes };
+  const seeding = opts.seeding ?? (stage.settings.seeding === 'kesin' ? 'kesin' : 'kademeli');
+  const r = drawKnockout(t, stage, entrants, mode, rng, idx === 0, seeding);
+  return { ...base, pairs: r.pairs, labels: r.labels, steps: r.steps, notes: r.notes, seeding: idx === 0 && mode === 'dengeli' ? seeding : undefined };
+}
+
+/**
+ * Canlı kura için çekiliş sırası ve pano düzeni. Önizlemede elle yapılan değişiklikleri de yansıtır.
+ * Öğrenciler izleyeceği için güç sırası gösterilmez; takımlar "1. torba, 2. torba ..." diye çekilir.
+ */
+export function liveDrawPlan(p: DrawProposal): { steps: DrawStep[]; layout: LiveSlot[] } {
+  const layout: LiveSlot[] = [];
+  const to = new Map<TeamId, string>();
+  const from = new Map<TeamId, string>();
+  const rank = (id: TeamId) => (p.labels[id] && /^\d+$/.test(p.labels[id]) ? Number(p.labels[id]) : 0);
+  const tierName = (r: number) => `${r <= 2 ? 1 : Math.ceil(Math.log2(r))}. torba`;
+  let order: TeamId[] | null = null;
+
+  if (p.groups) {
+    for (const g of p.groups) {
+      const title = p.type === 'lig' ? 'Lig (fikstür sırası)' : `${g.name} Grubu`;
+      layout.push({ title, kind: 'list', entries: g.teamIds.map((teamId) => ({ teamId })) });
+      for (const id of g.teamIds) to.set(id, title);
+    }
+  } else if (p.type === 'on-eleme') {
+    p.pairs!.forEach((x, i) => {
+      const title = `Ön eleme ${i + 1}`;
+      layout.push({ title, kind: 'match', entries: [{ teamId: x.a! }, { teamId: x.b! }] });
+      to.set(x.a!, title);
+      to.set(x.b!, title);
+      from.set(x.a!, 'Ön eleme torbası');
+      from.set(x.b!, 'Ön eleme torbası');
+    });
+    if (p.direct?.length) {
+      layout.push({ title: 'Doğrudan geçenler', kind: 'list', entries: p.direct.map((teamId) => ({ teamId })) });
+      for (const id of p.direct) {
+        to.set(id, 'Doğrudan geçenler');
+        from.set(id, 'Doğrudan geçenler');
+      }
+    }
+    order = [...(p.direct ?? []), ...p.pairs!.flatMap((x) => [x.a!, x.b!])];
+  } else {
+    const pairs = p.pairs!;
+    const hasBye = pairs.some((x) => !x.a || !x.b);
+    if (!hasBye) {
+      const name = knockoutRoundName(pairs.length * 2);
+      pairs.forEach((x, i) => {
+        const title = pairs.length === 1 ? 'Final' : `${name} ${i + 1}`;
+        layout.push({ title, kind: 'match', entries: [{ teamId: x.a! }, { teamId: x.b! }] });
+        to.set(x.a!, title);
+        to.set(x.b!, title);
+      });
+    } else {
+      // Ön eleme ağacın içinde: ana tablonun eşleşmeleri + ön eleme maçları
+      const mainName = knockoutRoundName(pairs.length);
+      const prelimCards: LiveSlot[] = [];
+      let pe = 0;
+      for (let j = 0; j < pairs.length / 2; j++) {
+        const title = pairs.length === 2 ? 'Final' : `${mainName} ${j + 1}`;
+        const entries: LiveSlot['entries'] = [];
+        for (const x of [pairs[2 * j], pairs[2 * j + 1]]) {
+          if (!x.a || !x.b) {
+            const id = (x.a ?? x.b)!;
+            entries.push({ teamId: id });
+            to.set(id, title);
+          } else {
+            pe++;
+            const pt = `Ön eleme ${pe}`;
+            entries.push({ text: `${pt} galibi` });
+            const card = `${pt} → ${title}`;
+            prelimCards.push({ title: card, kind: 'match', entries: [{ teamId: x.a }, { teamId: x.b }] });
+            to.set(x.a, card);
+            to.set(x.b, card);
+            from.set(x.a, 'Ön eleme torbası');
+            from.set(x.b, 'Ön eleme torbası');
+          }
+        }
+        layout.push({ title, kind: 'match', entries });
+      }
+      layout.unshift(...prelimCards);
+    }
+    // Güçlüler önce çekilir (torba torba); ön elemeciler en sonda
+    const all = pairs.flatMap((x) => [x.a, x.b]).filter((x): x is TeamId => !!x);
+    if (all.every((id) => rank(id) > 0)) {
+      order = all.slice().sort((x, y) => (from.has(x) ? 1 : 0) - (from.has(y) ? 1 : 0) || rank(x) - rank(y));
+      for (const id of all) if (!from.has(id)) from.set(id, tierName(rank(id)));
+    }
+  }
+  const base = order ? order.map((id) => p.steps.find((s) => s.teamId === id) ?? { teamId: id, from: '', to: '' }) : p.steps;
+  const steps = base.map((s) => ({
+    teamId: s.teamId,
+    from: from.get(s.teamId) ?? (/^Güç sırası/.test(s.from) ? 'Torba' : s.from),
+    to: to.get(s.teamId) ?? s.to,
+  }));
+  return { steps, layout };
 }
 
 /** Önizlemede iki takımın yerini değiştirir (grup, eşleşme veya doğrudan geçenler arasında). */
@@ -526,6 +625,7 @@ export function applyDraw(t: Tournament, p: DrawProposal, summary?: string): Sta
   stage.drawSeed = p.seed;
   stage.drawSteps = p.steps;
   stage.drawSummary = summary;
+  if (p.seeding) stage.settings.seeding = p.seeding;
   stage.manualOrder = {};
   stage.qualifiers = undefined;
   stage.direct = undefined;

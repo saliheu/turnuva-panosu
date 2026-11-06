@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   applyDraw,
   describeProposal,
+  liveDrawPlan,
   moveInProposal,
   proposeDraw,
   stageEntrants,
@@ -125,18 +126,77 @@ function ProposalEditor({ p, onChange }: { p: DrawProposal; onChange: (p: DrawPr
   );
 }
 
+type DrawChoice = 'kademeli' | 'kesin' | 'dengeli' | 'rastgele';
+
+function drawChoices(stage: Stage, isFirst: boolean, fromGroups: boolean): { id: DrawChoice; label: string; hint: string }[] {
+  const random = {
+    id: 'rastgele' as const,
+    label: 'Tamamen rastgele',
+    hint: 'Güç puanlarına hiç bakılmaz; takımlar tamamen rastgele yerleştirilir. Güçlü takımlar erken karşılaşabilir.',
+  };
+  if (stage.type === 'eleme' && isFirst) {
+    return [
+      {
+        id: 'kademeli',
+        label: 'Kademeli kura (önerilen)',
+        hint:
+          'En güçlü iki takım ağacın ayrı yarılarına konur; ancak finalde karşılaşabilirler. Sonraki güçlüler de birbirine erken denk gelmeyecek şekilde ayrı bölümlere kurayla dağıtılır. Güçlü takımların ilk rakibi zayıflar arasından kurayla belirlenir. Her çekilişte farklı bir ağaç çıkar.',
+      },
+      {
+        id: 'kesin',
+        label: 'Kesin güç sıralaması',
+        hint: 'Kurada şans yoktur: en güçlü takım en zayıfla, ikinci en güçlü sondan ikinciyle eşleşir. Yalnızca güç puanı aynı olanların sırası kurayla belirlenir; her çekilişte aynı ağaç çıkar.',
+      },
+      random,
+    ];
+  }
+  if (stage.type === 'eleme') {
+    return [
+      {
+        id: 'dengeli',
+        label: 'Plandaki kurala göre',
+        hint: fromGroups ? 'Eşleşmeler Format’ta seçtiğiniz kurala göre yapılır (ör. A grubu birincisi – B grubu ikincisi).' : 'Önceki aşamadaki başarı sırasına göre: en iyi takım en zayıfla eşleşir.',
+      },
+      random,
+    ];
+  }
+  if (stage.type === 'grup') {
+    return [
+      {
+        id: 'dengeli',
+        label: 'Dengeli (torbalarla, önerilen)',
+        hint: 'Güçlü takımlar aynı gruba düşmesin diye takımlar güç puanına göre torbalara ayrılır (1. torbada en güçlüler). Her gruba her torbadan bir takım kurayla düşer.',
+      },
+      random,
+    ];
+  }
+  if (stage.type === 'on-eleme') {
+    return [
+      { id: 'dengeli', label: 'En zayıflar oynasın (önerilen)', hint: 'Güç puanı en düşük takımlar ön eleme oynar; ön elemecilerin en güçlüsü en zayıfıyla eşleşir.' },
+      { ...random, hint: 'Ön eleme oynayacak takımlar güç puanına bakılmadan kurayla seçilir.' },
+    ];
+  }
+  return [{ id: 'dengeli', label: 'Fikstürü çek', hint: 'Her takım herkesle oynar; kimin hangi hafta kiminle oynayacağı kurayla belirlenir.' }];
+}
+
 function DrawPanel({ stage }: { stage: Stage }) {
   const { t, mutate } = useT();
-  const [mode, setMode] = useState<DrawMode>('dengeli');
+  const idx = t.stages.indexOf(stage);
+  const fromGroups = idx > 0 && (t.stages[idx - 1].type === 'grup' || t.stages[idx - 1].type === 'lig');
+  const choices = drawChoices(stage, idx === 0, fromGroups);
+  const [choice, setChoice] = useState<DrawChoice>(stage.settings.seeding === 'kesin' && choices.some((c) => c.id === 'kesin') ? 'kesin' : choices[0].id);
   const [p, setP] = useState<DrawProposal | null>(null);
   const [error, setError] = useState('');
   const [live, setLive] = useState(false);
   const entrants = stageEntrants(t, stage.id);
-  const idx = t.stages.indexOf(stage);
-  const make = (m: DrawMode = mode) => {
+
+  const make = () => {
     try {
       setError('');
-      setP(proposeDraw(t, stage.id, m, randomSeed()));
+      const mode: DrawMode = choice === 'rastgele' ? 'rastgele' : 'dengeli';
+      const seeding = choice === 'kesin' ? 'kesin' : 'kademeli';
+      setP(proposeDraw(t, stage.id, mode, randomSeed(), { seeding }));
+      setLive(true);
     } catch (e) {
       setError((e as Error).message);
       setP(null);
@@ -145,11 +205,14 @@ function DrawPanel({ stage }: { stage: Stage }) {
   if (!entrants) return <div className="alert info">Önceki aşama tamamlanınca bu aşamanın kurası çekilebilir.</div>;
   const errs = p ? validateProposal(p) : [];
   const summary = p && !errs.length ? describeProposal(t, p) : '';
-  const fromGroups = idx > 0 && (t.stages[idx - 1].type === 'grup' || t.stages[idx - 1].type === 'lig');
+  const plan = p ? liveDrawPlan(p) : null;
 
   const commit = async () => {
-    if (!p) return;
-    const ok = await mutate(`Kura kesinleşti: ${stage.name}`, (d) => void applyDraw(d, { ...p, steps: stepsFor(p) }, summary));
+    if (!p || !plan) return;
+    const ok = await mutate(`Kura kesinleşti: ${stage.name}`, (d) => {
+      applyDraw(d, { ...p, steps: plan.steps }, summary);
+      d.stages.find((s) => s.id === stage.id)!.drawLayout = plan.layout;
+    });
     if (ok) setP(null);
   };
 
@@ -158,38 +221,39 @@ function DrawPanel({ stage }: { stage: Stage }) {
       <p className="small muted" style={{ marginTop: 0 }}>
         {entrants.length} takım bu aşamaya katılacak.
       </p>
-      <div className="btn-row">
-        <div className="seg">
-          <button className={mode === 'dengeli' ? 'on' : ''} onClick={() => (setMode('dengeli'), p && make('dengeli'))}>
-            {fromGroups ? 'Plandaki kurala göre' : 'Dengeli (güç puanına göre)'}
-          </button>
-          <button className={mode === 'rastgele' ? 'on' : ''} onClick={() => (setMode('rastgele'), p && make('rastgele'))}>
-            Tamamen rastgele
-          </button>
-        </div>
-        <button className="btn accent" onClick={() => make()}>
-          {p ? 'Kurayı yeniden çek' : 'Kurayı çek'}
-        </button>
-      </div>
-      <p className="tiny muted">
-        {mode === 'dengeli'
-          ? stage.type === 'grup'
-            ? 'Güçlü takımlar aynı gruba düşmesin diye takımlar güç puanına göre torbalara ayrılır (1. torbada en güçlüler). Her gruba her torbadan bir takım düşer. Güç puanı aynı olanların sırası kurayla belirlenir.'
-            : stage.type === 'on-eleme'
-              ? 'En zayıf takımlar ön eleme oynar. Ön eleme oynayanların en güçlüsü en zayıfıyla eşleşir.'
-              : fromGroups
-                ? 'Eşleşmeler Format’ta seçtiğiniz kurala göre yapılır (ör. A grubu birincisi – B grubu ikincisi).'
-                : stage.settings.seeding === 'kesin'
-                  ? 'Kesin güç sıralaması: en güçlü takım en zayıfla eşleşir. Puanı aynı olanlar dışında her kurada aynı ağaç çıkar.'
-                  : 'Kademeli kura: en güçlü iki takım ağacın ayrı yarılarına konur, güçlüler birbirine erken denk gelmez; kimin kiminle eşleşeceği kurayla belirlenir. Her “yeniden çek”te farklı bir ağaç çıkar.'
-          : 'Güç puanlarına bakılmaz; takımlar tamamen rastgele yerleştirilir.'}
-        {' '}Kura kaydedilmeden önce size gösterilir; beğenmezseniz yeniden çekebilir veya takımların yerini elle değiştirebilirsiniz.
-      </p>
+      {!p && (
+        <>
+          {choices.length > 1 && (
+            <fieldset className="seeding-box">
+              <legend>Kura nasıl çekilsin?</legend>
+              {choices.map((c) => (
+                <label key={c.id} className={`seed-opt${choice === c.id ? ' on' : ''}`}>
+                  <input type="radio" name={`draw-${stage.id}`} checked={choice === c.id} onChange={() => setChoice(c.id)} />
+                  <span>
+                    <b>{c.label}</b>
+                    <span className="small seed-desc">{c.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {choices.length === 1 && <p className="small">{choices[0].hint}</p>}
+          <div className="btn-row" style={{ marginTop: '0.75rem' }}>
+            <button className="btn accent" onClick={make}>
+              ▶ Kurayı çek
+            </button>
+          </div>
+          <p className="tiny muted">Kura canlı olarak gösterilir. Bittikten sonra sonucu kontrol edip kesinleştirirsiniz; kesinleştirmeden hiçbir şey kaydedilmez.</p>
+        </>
+      )}
       {error && <div className="alert error">{error}</div>}
-      {p && (
-        <div style={{ marginTop: '0.75rem' }}>
+      {p && !live && (
+        <div style={{ marginTop: '0.25rem' }}>
           <div className="alert info" style={{ fontSize: '1rem' }}>
             <b>Kura sonucu (henüz kaydedilmedi):</b> {summary || '—'}
+            <div className="small muted" style={{ marginTop: 4 }}>
+              Yöntem: {choices.find((c) => c.id === choice)?.label}
+            </div>
           </div>
           {p.notes.map((n, i) => (
             <div className="alert warn" key={i}>
@@ -207,44 +271,35 @@ function DrawPanel({ stage }: { stage: Stage }) {
           )}
           <ProposalEditor p={p} onChange={setP} />
           <div className="btn-row" style={{ marginTop: '0.75rem' }}>
-            <button className="btn ghost" onClick={() => setLive(true)}>
-              ▶ Canlı kura olarak göster
-            </button>
             <button className="btn accent" onClick={commit} disabled={errs.length > 0}>
               Kurayı kesinleştir
+            </button>
+            <button className="btn ghost" onClick={() => setLive(true)}>
+              ▶ Canlı kurayı tekrar izle
+            </button>
+            <button className="btn ghost" onClick={make}>
+              Kurayı yeniden çek
             </button>
             <button className="btn ghost" onClick={() => setP(null)}>
               Vazgeç
             </button>
           </div>
-          <p className="tiny muted">Canlı kura, önizlemedeki son hâli takım takım gösterir (elle yaptığınız değişiklikler dahil). Kesinleştirmeden hiçbir şey kaydedilmez.</p>
+          <p className="tiny muted">Takımların yerini yukarıdaki listelerden elle değiştirebilirsiniz. Kesinleştirince kura kaydedilir ve maç programı oluşur.</p>
         </div>
       )}
-      {live && p && <LiveDraw t={t} title={`${t.name} · ${stage.name}`} steps={stepsFor(p)} onClose={() => setLive(false)} />}
+      {live && p && plan && (
+        <LiveDraw
+          t={t}
+          title={`${t.name} · ${stage.name}`}
+          steps={plan.steps}
+          layout={plan.layout}
+          autoStart
+          doneLabel="Sonucu gör ve kesinleştir"
+          onClose={() => setLive(false)}
+        />
+      )}
     </div>
   );
-}
-
-/** Elle düzenlenmiş önizlemeyle uyumlu çekiliş sırası */
-function stepsFor(p: DrawProposal) {
-  const placed = new Map<TeamId, string>();
-  if (p.groups) for (const g of p.groups) g.teamIds.forEach((id, i) => placed.set(id, p.type === 'lig' ? `Fikstür sırası ${i + 1}` : `${g.name} Grubu`));
-  if (p.pairs) {
-    const hasBye = p.pairs.some((x) => !x.a || !x.b);
-    let pe = 0;
-    p.pairs.forEach((x, i) => {
-      if (!x.a || !x.b) {
-        const id = x.a ?? x.b;
-        if (id) placed.set(id, 'Doğrudan ana tabloya');
-        return;
-      }
-      const to = p.type === 'on-eleme' || hasBye ? `Ön eleme ${++pe}` : `Maç ${i + 1}`;
-      placed.set(x.a, to);
-      placed.set(x.b, to);
-    });
-  }
-  if (p.direct) for (const id of p.direct) placed.set(id, 'Doğrudan ana tabloya');
-  return p.steps.map((s) => ({ ...s, to: placed.get(s.teamId) ?? s.to }));
 }
 
 function GroupSwap({ stage }: { stage: Stage }) {
