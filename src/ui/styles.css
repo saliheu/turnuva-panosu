@@ -1471,3 +1471,40 @@ button.link {
   padding: 0.6rem 0.75rem;
   background: #fff;
 }
+
+fieldset.seeding-box {
+  min-width: 0;
+}
+fieldset.seeding-box legend {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink-2);
+  padding: 0 0.3rem;
+}
+.seed-opt {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  border: 1.5px solid var(--line-2);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  margin-top: 0.5rem;
+  cursor: pointer;
+  background: #fff;
+}
+.seed-opt.on {
+  border-color: var(--accent);
+  background: #fff8f4;
+}
+.seed-opt input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  flex: none;
+  accent-color: var(--accent);
+}
+.seed-desc {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--ink-2);
+}

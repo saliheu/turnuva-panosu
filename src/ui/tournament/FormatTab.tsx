@@ -286,32 +286,33 @@ function StageEditor({
             Üçüncülük maçı oynansın
           </label>
           {!prevType && (
-            <div className="seeding-box">
-              <label className="check">
-                <input
-                  type="checkbox"
-                  disabled={locked}
-                  checked={s.seeding === 'kesin'}
-                  onChange={(e) => set({ seeding: e.target.checked ? 'kesin' : 'kademeli' })}
-                />
-                <b>Kesin güç sıralaması kullan</b>
+            <fieldset className="seeding-box" disabled={locked}>
+              <legend>Eleme ağacı nasıl dizilsin?</legend>
+              <label className={`seed-opt${s.seeding !== 'kesin' ? ' on' : ''}`}>
+                <input type="radio" name={`seeding-${index}`} checked={s.seeding !== 'kesin'} onChange={() => set({ seeding: 'kademeli' })} />
+                <span>
+                  <b>Kademeli kura</b> <span className="badge done">Önerilen</span>
+                  <span className="small seed-desc">
+                    En güçlü iki takım ağacın ayrı yarılarına konur; ancak finalde karşılaşabilirler. Sonraki güçlüler de (3.–4., 5.–8. …) birbirine erken
+                    denk gelmeyecek şekilde ayrı bölümlere <b>kurayla</b> dağıtılır. İlk turda güçlü takımların rakibi zayıflar arasından kurayla belirlenir.
+                    Her kurada farklı bir ağaç çıkar.
+                  </span>
+                </span>
               </label>
-              {s.seeding === 'kesin' ? (
-                <p className="small" style={{ margin: '0.25rem 0 0' }}>
-                  Takımlar tamamen güç puanına göre dizilir: en güçlü takım en zayıfla, ikinci en güçlü sondan ikinciyle eşleşir. Kurada şans yoktur;
-                  yalnızca güç puanı aynı olan takımların sırası kurayla belirlenir. Her çekilişte aynı ağaç çıkar.
-                </p>
-              ) : (
-                <p className="small" style={{ margin: '0.25rem 0 0' }}>
-                  <b>Kademeli kura (önerilen):</b> En güçlü iki takım ağacın ayrı yarılarına konur; ancak finalde karşılaşabilirler. Sonraki güçlüler de
-                  (3.–4., 5.–8. …) birbirine erken denk gelmeyecek şekilde ayrı bölümlere <b>kurayla</b> dağıtılır. İlk turda güçlü yarıdaki her takımın
-                  rakibi zayıf yarıdan kurayla belirlenir; yani güçlü iki takım ilk turda eşleşmez ama kimin kiminle oynayacağı her kurada değişir.
-                </p>
-              )}
+              <label className={`seed-opt${s.seeding === 'kesin' ? ' on' : ''}`}>
+                <input type="radio" name={`seeding-${index}`} checked={s.seeding === 'kesin'} onChange={() => set({ seeding: 'kesin' })} />
+                <span>
+                  <b>Kesin güç sıralaması</b>
+                  <span className="small seed-desc">
+                    Takımlar tamamen güç puanına göre dizilir: en güçlü takım en zayıfla, ikinci en güçlü sondan ikinciyle eşleşir. Kurada şans yoktur
+                    (yalnızca güç puanı aynı olanların sırası kurayla belirlenir); her çekilişte aynı ağaç çıkar.
+                  </span>
+                </span>
+              </label>
               <p className="small muted" style={{ margin: '0.35rem 0 0' }}>
                 Takım sayısı 2, 4, 8, 16, 32 veya 64 değilse en zayıf takımlar önce ön eleme oynar; ön eleme maçları ağacın en solunda görünür.
               </p>
-            </div>
+            </fieldset>
           )}
         </div>
       )}
