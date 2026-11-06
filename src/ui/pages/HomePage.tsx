@@ -32,10 +32,19 @@ export default function HomePage() {
   const { settings, admin } = useSession();
   const [data, setData] = useState<PublicData | null>(null);
   const [error, setError] = useState('');
+  const [drafts, setDrafts] = useState<TournamentSummary[]>([]);
   useDocumentTitle(settings.siteTitle);
   useEffect(() => {
     api.publicData().then(setData).catch((e) => setError(e.message));
   }, []);
+  // Taslaklar herkese kapalıdır; yönetici ana sayfada kendi taslaklarını görür
+  useEffect(() => {
+    if (!admin) return setDrafts([]);
+    api
+      .listAll()
+      .then((all) => setDrafts(all.filter((t) => t.status === 'taslak' && !t.archived).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))))
+      .catch(() => setDrafts([]));
+  }, [admin]);
 
   if (error) return <div className="alert error">{error}</div>;
   if (!data) return <Spinner />;
@@ -55,6 +64,20 @@ export default function HomePage() {
           </Link>
         )}
       </section>
+
+      {admin && drafts.length > 0 && (
+        <section className="section">
+          <div className="section-head">
+            <h2>Taslak turnuvalarınız</h2>
+            <span className="small muted">Yalnızca siz görüyorsunuz. Yayınlamak için turnuvanın Ayarlar sekmesinden “Devam ediyor” yapın.</span>
+          </div>
+          <div className="grid">
+            {drafts.map((t) => (
+              <TournamentCard key={t.id} t={t} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="section">
         <div className="section-head">

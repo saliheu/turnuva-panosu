@@ -82,6 +82,49 @@ function ProposalEditor({ p, onChange }: { p: DrawProposal; onChange: (p: DrawPr
       </div>
     );
   }
+  // Ön eleme ağacın içindeyse: önce ön eleme maçları, sonra ana tablo ("vs Ön eleme galibi")
+  if (p.type === 'eleme' && p.pairs!.some((x) => !x.a || !x.b)) {
+    const pairs = p.pairs!;
+    const prelimNo = new Map<number, number>();
+    pairs.forEach((x, i) => x.a && x.b && prelimNo.set(i, prelimNo.size + 1));
+    const side = (i: number) => {
+      const x = pairs[i];
+      if (x.a && x.b) return <span className="muted">Ön eleme {prelimNo.get(i)} galibi</span>;
+      const id = (x.a ?? x.b)!;
+      return <TeamSelect value={id} options={all} label="Takım" labels={p.labels} onPick={(y) => onChange(swapInProposal(p, id, y))} />;
+    };
+    return (
+      <>
+        <div className="group-box" style={{ marginBottom: '0.75rem' }}>
+          <h4>Ön eleme maçları</h4>
+          {pairs.map((x, i) =>
+            x.a && x.b ? (
+              <div className="pair-row" key={i}>
+                <span className="tiny muted">{prelimNo.get(i)}.</span>
+                <TeamSelect value={x.a} options={all} label="1. takım" labels={p.labels} onPick={(y) => onChange(swapInProposal(p, x.a!, y))} />
+                <span className="muted small">vs</span>
+                <TeamSelect value={x.b} options={all} label="2. takım" labels={p.labels} onPick={(y) => onChange(swapInProposal(p, x.b!, y))} />
+              </div>
+            ) : null,
+          )}
+        </div>
+        <div className="group-box">
+          <h4>Ana tablo eşleşmeleri</h4>
+          {Array.from({ length: pairs.length / 2 }, (_, j) => (
+            <div className="pair-row" key={j}>
+              <span className="tiny muted">{j + 1}.</span>
+              {side(2 * j)}
+              <span className="muted small">vs</span>
+              {side(2 * j + 1)}
+            </div>
+          ))}
+          <p className="tiny muted" style={{ marginBottom: 0 }}>
+            Bir takımı değiştirdiğinizde iki takımın yeri karşılıklı değişir.
+          </p>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       {p.direct && (
