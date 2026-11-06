@@ -72,5 +72,5 @@ export function stageRoundLabel(stage: Stage, round: number, third?: boolean): s
     if (teams === 8) return 'Çeyrek Final';
     return `Son ${teams}`;
   }
-  return `${round}. Hafta`;
+  return `${round}. Tur Maçları`;
 }

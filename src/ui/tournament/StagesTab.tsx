@@ -219,7 +219,7 @@ function drawChoices(stage: Stage, isFirst: boolean, fromGroups: boolean): { id:
       { ...random, hint: 'Ön eleme oynayacak takımlar güç puanına bakılmadan kurayla seçilir.' },
     ];
   }
-  return [{ id: 'dengeli', label: 'Fikstürü çek', hint: 'Her takım herkesle oynar; kimin hangi hafta kiminle oynayacağı kurayla belirlenir.' }];
+  return [{ id: 'dengeli', label: 'Fikstürü çek', hint: 'Her takım herkesle oynar; maçların sırası (kim hangi turda kiminle oynayacak) kurayla belirlenir.' }];
 }
 
 function DrawPanel({ stage }: { stage: Stage }) {

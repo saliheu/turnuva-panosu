@@ -44,7 +44,7 @@ function matchRows(t: Tournament) {
 export async function exportExcel(t: Tournament) {
   const { default: writeXlsxFile } = await import('write-excel-file/browser');
   const bold = (v: string) => ({ value: v, fontWeight: 'bold' as const });
-  const header = ['Aşama', 'Grup', 'Tur / Hafta', 'Maç No', 'Tarih', 'Saat', 'Saha', 'Takım 1', 'Skor 1', 'Skor 2', 'Takım 2', 'Not'];
+  const header = ['Aşama', 'Grup', 'Tur', 'Maç No', 'Tarih', 'Saat', 'Saha', 'Takım 1', 'Skor 1', 'Skor 2', 'Takım 2', 'Not'];
   const cell = (v: string | number | null) => (v === null || v === '' ? null : typeof v === 'number' ? { value: v, type: Number } : { value: v });
   const fixture = [
     [bold(`${t.name} — ${t.sport} — ${t.schoolYear}${t.category ? ` — ${t.category}` : ''}`)],

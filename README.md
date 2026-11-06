@@ -201,7 +201,7 @@ Kurulum sırasında soru sormamak için aşağıdaki makul varsayımlar yapıld�
 9. “Tamamen rastgele” kurada güç puanları hiç kullanılmaz.
 10. Çapraz eşleşme (A1-B2, C1-D2 | B1-A2, D1-C2) çift sayıda grup ve gruptan 1-2 takım çıkışı gerektirir; uymazsa sıralı eşleşmeye (1.ler en zayıf 2.ler/3.lerle) geçilir ve uyarılır. Aynı gruptan çıkanlar yalnızca **ilk turda** ayrılır.
 11. Gruplardan sonra eleme kurasında “dengeli” mod, aşamadaki tur atlama kuralını uygular; “rastgele” mod eşleşmeleri karıştırır (aynı grup kuralı yine uygulanır).
-12. Lig/grup fikstürü daire (Berger) yöntemiyle kurulur; tek sayıda takımda her hafta bir takım bay geçer. Rövanşlı ligde ikinci yarı, ilk yarının ev/deplasman çevrilmiş hâlidir.
+12. Lig/grup fikstürü daire (Berger) yöntemiyle kurulur; tek sayıda takımda her turda bir takım maç yapmaz (bay). Rövanşlı ligde ikinci yarı, ilk yarının ev/deplasman çevrilmiş hâlidir.
 
 **Puanlama ve sıralama**
 13. Branşa göre hazır puanlama (Ayarlar’dan değiştirilebilir):
@@ -244,8 +244,8 @@ npm test
 
 - **Matris testi** (`tests/fixture-matrix.test.ts`): 2–64 arasındaki **her takım sayısı** için 4 şablonun önerdiği **tüm seçenekler**, hem dengeli hem rastgele kurayla baştan sona oynatılır (rastgele skorlar, beraberlikler, penaltılar, hükmen sonuçlar, yönetici eşitlik kararları). Her adımda denetlenenler:
   - Her takım tam bir kez yerleşiyor (grup, ağaç veya ön eleme); bay sayısı doğru.
-  - Hiçbir takım aynı turda/haftada iki kez oynamıyor.
-  - Rövanşlı liglerde iki takım aynı haftada eşleşmiyor; her çift tam olarak 1 veya 2 kez karşılaşıyor.
+  - Hiçbir takım aynı turda iki kez oynamıyor.
+  - Rövanşlı liglerde iki takım aynı turda eşleşmiyor; her çift tam olarak 1 veya 2 kez karşılaşıyor.
   - Puan durumunda takım tekrarı yok; oynanan maç sayıları tutarlı.
   - Dengeli grup kurasında her grupta her torbadan en fazla bir takım var.
   - Ön elemeyi en zayıflar oynuyor; maç sayısı = takım sayısı − hedef.
